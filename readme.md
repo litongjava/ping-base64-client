@@ -14,6 +14,6 @@ ping-base64-client.exe -url http://192.168.3.9:10405/file/upload-run/ -file {loc
 -file localfile:本地文件通常是一个压缩包,上传到服务器上
 -m savePath:上传文件保存路径
 -d unzipPath:上传文件解压路径
--d cmd:解压完成执行的命令
+-c cmd:解压完成执行的命令
 ```
 
