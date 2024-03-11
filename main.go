@@ -1,152 +1,195 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
-	"flag"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"log"
-	"mime/multipart"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+  "bytes"
+  "encoding/base64"
+  "flag"
+  "fmt"
+  "github.com/spf13/viper"
+  "io"
+  "io/ioutil"
+  "log"
+  "mime/multipart"
+  "net/http"
+  "os"
+  "path/filepath"
+  "strings"
+  "time"
 )
 
+func init() {
+  log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+}
 func main() {
-	//url := "https://zwfw-test.dgprj.com/ztbjg-portal/ping-base64-webapi/file/upload-unzip/"
-	url := flag.String("url", "", "remote server url")
-	//filePath := "E:\code\project\ShuZiGuangDong\ztjgw-personal\ztbjg-yhzx.zip"
-	filePath := flag.String("file", "", "local file path")
-	//d := "/data/apps/web/ztbjg"
-	m := flag.String("m", "", "move to file path")
-	d := flag.String("d", "", "extra file path")
-	c := flag.String("c", "", "full command")
-	flag.Parse()
-	log.Println("url:", *url)
-	log.Println("filePath:", *filePath)
-	log.Println("m:", *m)
-	log.Println("d:", *d)
-	log.Println("c:", *c)
-	start := time.Now().Unix()
-	if strings.HasSuffix(*url, "upload-run/") {
-		log.Println("upload-run")
-		if len(*url) == 0 {
-			fmt.Println("please specified remote server url")
-			return
-		}
-		if len(*filePath) == 0 {
-			fmt.Println("please specified local file path")
-			return
-		}
-		uploadAndRun(url, filePath, m, d, c)
-	} else if strings.HasSuffix(*url, "web/") {
-		log.Println("web")
-		flag.Parse()
-		runRemoteCmd(url, c)
-	}
-	end := time.Now().Unix()
-	fmt.Println(end-start, "s")
-	fmt.Println("done")
+  a := flag.String("a", "", "action")
+  url := flag.String("url", "", "remote server url")
+  //filePath := target/malang-pen-api-server-1.0.0.jar
+  filePath := flag.String("file", "", "local file path")
+  //d := "/data/apps/web/ztbjg"
+  m := flag.String("m", "", "move to file path")
+  d := flag.String("d", "", "extra file path")
+  c := flag.String("c", "", "full command")
+
+  flag.Parse()
+
+  if *a == "upload-run" {
+    // read config file
+    viper.SetConfigFile("ping-base64.toml")
+    viper.SetConfigType("toml")
+    if err := viper.ReadInConfig(); err != nil {
+      log.Fatalf("Error reading config file, %s", err)
+    }
+
+    // read config item
+    if *url == "" {
+      *url = viper.GetString("upload-run.url")
+    }
+
+    if *filePath == "" {
+      *filePath = viper.GetString("upload-run.file")
+    }
+
+    if *m == "" {
+      *m = viper.GetString("upload-run.m")
+    }
+
+    if *d == "" {
+      *d = viper.GetString("upload-run.d")
+    }
+
+    if *c == "" {
+      *c = viper.GetString("upload-run.c")
+    }
+
+  }
+
+  log.Println("url:", *url)
+  log.Println("filePath:", *filePath)
+  log.Println("m:", *m)
+  log.Println("d:", *d)
+  log.Println("c:", *c)
+
+  start := time.Now().Unix()
+  if strings.HasSuffix(*url, "upload-run/") {
+    log.Println("upload-run")
+    if len(*url) == 0 {
+      fmt.Println("please specified remote server url")
+      return
+    }
+    if len(*filePath) == 0 {
+      fmt.Println("please specified local file path")
+      return
+    }
+    uploadAndRun(url, filePath, m, d, c)
+  } else if strings.HasSuffix(*url, "web/") {
+    log.Println("web")
+    flag.Parse()
+    runRemoteCmd(url, c)
+  }
+  end := time.Now().Unix()
+  fmt.Println(end-start, "s")
+  fmt.Println("done")
 }
 
 func uploadAndRun(url *string, filePath *string, m *string, d *string, c *string) {
-	log.Println("uploading...")
+  var file, errFile1 = os.Open(*filePath)
+  if errFile1 != nil {
+    log.Fatalln(errFile1)
+  }
+  defer file.Close()
+  var fileInfo, err = file.Stat()
+  if err != nil {
+    log.Fatalln(err)
+  }
+  var fileSize = fileInfo.Size()
 
-	method := "POST"
-	payload := &bytes.Buffer{}
-	writer := multipart.NewWriter(payload)
+  log.Printf("file is uploading,and file size is %d KB", fileSize/1024)
 
-	file, errFile1 := os.Open(*filePath)
-	defer file.Close()
-	part1,
-		errFile1 := writer.CreateFormFile("file", filepath.Base(*filePath))
-	_, errFile1 = io.Copy(part1, file)
-	if errFile1 != nil {
-		fmt.Println(errFile1)
-		return
-	}
+  method := "POST"
+  payload := &bytes.Buffer{}
 
-	if len(*m) != 0 {
-		_ = writer.WriteField("m", *m)
-	}
+  // io.Writer
+  writer := multipart.NewWriter(payload)
+  part1, errFile1 := writer.CreateFormFile("file", filepath.Base(*filePath))
+  _, errFile1 = io.Copy(part1, file)
+  if errFile1 != nil {
+    log.Fatalln(errFile1)
+    return
+  }
 
-	if len(*d) != 0 {
-		_ = writer.WriteField("d", *d)
-	}
+  if len(*m) != 0 {
+    _ = writer.WriteField("m", *m)
+  }
 
-	if len(*c) != 0 {
-		_ = writer.WriteField("c", *c)
-	}
+  if len(*d) != 0 {
+    _ = writer.WriteField("d", *d)
+  }
 
-	err := writer.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+  if len(*c) != 0 {
+    _ = writer.WriteField("c", *c)
+  }
 
-	client := &http.Client{}
-	req, err := http.NewRequest(method, *url, payload)
+  err = writer.Close()
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
 
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	req.Header.Add("User-Agent", "apifox/1.0.0 (https://www.apifox.cn)")
+  req, err := http.NewRequest(method, *url, payload)
+  if err != nil {
+    log.Fatalln(err)
+  }
+  req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	code := res.StatusCode
-	fmt.Println("response status dode", code)
-	defer res.Body.Close()
-	//goland:noinspection ALL
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(string(body))
+  client := &http.Client{}
+  res, err := client.Do(req)
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
+  code := res.StatusCode
+  fmt.Println("response status dode", code)
+  defer res.Body.Close()
+  //goland:noinspection ALL
+  body, err := ioutil.ReadAll(res.Body)
+  if err != nil {
+    log.Fatalln(err)
+  }
+  fmt.Println(string(body))
 }
 
 func runRemoteCmd(url *string, c *string) {
-	log.Println("running...")
-	cmd := base64.StdEncoding.EncodeToString([]byte(*c))
-	newUrl := *url + cmd
-	method := "GET"
+  log.Println("running...")
+  cmd := base64.StdEncoding.EncodeToString([]byte(*c))
+  newUrl := *url + cmd
+  method := "GET"
 
-	client := &http.Client{}
-	req, err := http.NewRequest(method, newUrl, nil)
+  client := &http.Client{}
+  req, err := http.NewRequest(method, newUrl, nil)
 
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer res.Body.Close()
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
+  res, err := client.Do(req)
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
+  defer res.Body.Close()
 
-	//goland:noinspection ALL
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	decodedBytes := make([]byte, base64.StdEncoding.DecodedLen(len(body)))
-	_, err = base64.StdEncoding.Decode(decodedBytes, []byte(body))
-	if err != nil {
-		fmt.Println("decode error:", err)
-		return
-	}
+  //goland:noinspection ALL
+  body, err := ioutil.ReadAll(res.Body)
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
+  decodedBytes := make([]byte, base64.StdEncoding.DecodedLen(len(body)))
+  _, err = base64.StdEncoding.Decode(decodedBytes, []byte(body))
+  if err != nil {
+    fmt.Println("decode error:", err)
+    return
+  }
 
-	fmt.Println(string(decodedBytes))
+  fmt.Println(string(decodedBytes))
 }
