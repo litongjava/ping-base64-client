@@ -22,6 +22,7 @@ func init() {
 }
 func main() {
   a := flag.String("a", "", "action")
+  e := flag.String("a", "dev", "environment:such dev,test,prod")
   url := flag.String("url", "", "remote server url")
   //filePath := target/malang-pen-api-server-1.0.0.jar
   filePath := flag.String("file", "", "local file path")
@@ -42,23 +43,23 @@ func main() {
 
     // read config item
     if *url == "" {
-      *url = viper.GetString("upload-run.url")
+      *url = viper.GetString(*e + ".upload-run.url")
     }
 
     if *filePath == "" {
-      *filePath = viper.GetString("upload-run.file")
+      *filePath = viper.GetString(*e + ".upload-run.file")
     }
 
     if *m == "" {
-      *m = viper.GetString("upload-run.m")
+      *m = viper.GetString(*e + ".upload-run.m")
     }
 
     if *d == "" {
-      *d = viper.GetString("upload-run.d")
+      *d = viper.GetString(*e + ".upload-run.d")
     }
 
     if *c == "" {
-      *c = viper.GetString("upload-run.c")
+      *c = viper.GetString(*e + ".upload-run.c")
     }
 
   }
