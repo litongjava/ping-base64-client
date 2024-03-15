@@ -2,6 +2,7 @@ package main
 
 import (
   "bytes"
+  "crypto/tls"
   "encoding/base64"
   "flag"
   "fmt"
@@ -22,7 +23,7 @@ func init() {
 }
 func main() {
   a := flag.String("a", "", "action")
-  e := flag.String("a", "dev", "environment:such dev,test,prod")
+  e := flag.String("e", "dev", "environment:such dev,test,prod")
   url := flag.String("url", "", "remote server url")
   //filePath := target/malang-pen-api-server-1.0.0.jar
   filePath := flag.String("file", "", "local file path")
@@ -33,18 +34,19 @@ func main() {
 
   flag.Parse()
 
-  if *a == "upload-run" {
-    // read config file
-    viper.SetConfigFile("ping-base64.toml")
-    viper.SetConfigType("toml")
-    if err := viper.ReadInConfig(); err != nil {
-      log.Fatalf("Error reading config file, %s", err)
-    }
+  // read config file
+  viper.SetConfigFile("ping-base64.toml")
+  viper.SetConfigType("toml")
+  if err := viper.ReadInConfig(); err != nil {
+    log.Println("Error reading config file, %s", err)
+  }
 
-    // read config item
-    if *url == "" {
-      *url = viper.GetString(*e + ".upload-run.url")
-    }
+  // read config item
+  if *url == "" {
+    *url = viper.GetString(*e + "." + *a + ".url")
+  }
+
+  if *a == "upload-run" {
 
     if *filePath == "" {
       *filePath = viper.GetString(*e + ".upload-run.file")
@@ -59,16 +61,23 @@ func main() {
     }
 
     if *c == "" {
-      *c = viper.GetString(*e + ".upload-run.c")
+      *c = viper.GetString(*e + "." + *a + ".c")
     }
 
+    log.Println("url:", *url)
+    log.Println("filePath:", *filePath)
+    log.Println("m:", *m)
+    log.Println("d:", *d)
+    log.Println("c:", *c)
   }
 
-  log.Println("url:", *url)
-  log.Println("filePath:", *filePath)
-  log.Println("m:", *m)
-  log.Println("d:", *d)
-  log.Println("c:", *c)
+  if *a == "web" {
+    if *c == "" {
+      *c = viper.GetString(*e + "." + *a + ".c")
+    }
+    log.Println("url:", *url)
+    log.Println("c:", *c)
+  }
 
   start := time.Now().Unix()
   if strings.HasSuffix(*url, "upload-run/") {
@@ -84,7 +93,6 @@ func main() {
     uploadAndRun(url, filePath, m, d, c)
   } else if strings.HasSuffix(*url, "web/") {
     log.Println("web")
-    flag.Parse()
     runRemoteCmd(url, c)
   }
   end := time.Now().Unix()
@@ -142,7 +150,11 @@ func uploadAndRun(url *string, filePath *string, m *string, d *string, c *string
   }
   req.Header.Set("Content-Type", writer.FormDataContentType())
 
-  client := &http.Client{}
+  client := &http.Client{
+    Transport: &http.Transport{
+      TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+    },
+  }
   res, err := client.Do(req)
   if err != nil {
     fmt.Println(err)
