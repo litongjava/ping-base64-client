@@ -80,6 +80,11 @@ func main() {
   }
 
   start := time.Now().Unix()
+  var client *http.Client = &http.Client{
+    Transport: &http.Transport{
+      TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+    },
+  }
   if strings.HasSuffix(*url, "upload-run/") {
     log.Println("upload-run")
     if len(*url) == 0 {
@@ -90,17 +95,17 @@ func main() {
       fmt.Println("please specified local file path")
       return
     }
-    uploadAndRun(url, filePath, m, d, c)
+    uploadAndRun(client, url, filePath, m, d, c)
   } else if strings.HasSuffix(*url, "web/") {
     log.Println("web")
-    runRemoteCmd(url, c)
+    runRemoteCmd(client, url, c)
   }
   end := time.Now().Unix()
   fmt.Println(end-start, "s")
   fmt.Println("done")
 }
 
-func uploadAndRun(url *string, filePath *string, m *string, d *string, c *string) {
+func uploadAndRun(client *http.Client, url *string, filePath *string, m *string, d *string, c *string) {
   var file, errFile1 = os.Open(*filePath)
   if errFile1 != nil {
     log.Fatalln(errFile1)
@@ -150,14 +155,9 @@ func uploadAndRun(url *string, filePath *string, m *string, d *string, c *string
   }
   req.Header.Set("Content-Type", writer.FormDataContentType())
 
-  client := &http.Client{
-    Transport: &http.Transport{
-      TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-    },
-  }
   res, err := client.Do(req)
   if err != nil {
-    fmt.Println(err)
+    fmt.Println("Faild to send http request", err)
     return
   }
   code := res.StatusCode
@@ -171,13 +171,12 @@ func uploadAndRun(url *string, filePath *string, m *string, d *string, c *string
   fmt.Println(string(body))
 }
 
-func runRemoteCmd(url *string, c *string) {
+func runRemoteCmd(client *http.Client, url *string, c *string) {
   log.Println("running...")
   cmd := base64.StdEncoding.EncodeToString([]byte(*c))
   newUrl := *url + cmd
   method := "GET"
 
-  client := &http.Client{}
   req, err := http.NewRequest(method, newUrl, nil)
 
   if err != nil {
